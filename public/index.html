@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ice Cream Robot — Live View</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream:   #fdf6e3;
+    --amber:   #f59e0b;
+    --amber-d: #b45309;
+    --teal:    #0d9488;
+    --teal-l:  #5eead4;
+    --coral:   #fb7185;
+    --plum:    #4c1d95;
+    --slate:   #334155;
+    --choc:    #7c2d12;
+    --straw:   #be123c;
+    --mango:   #92400e;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--cream);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 28px 16px 40px;
+    background-image:
+      radial-gradient(circle at 15% 20%, rgba(245,158,11,.08) 0%, transparent 50%),
+      radial-gradient(circle at 85% 80%, rgba(13,148,136,.07) 0%, transparent 50%);
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 22px;
+  }
+
+  h1 {
+    font-family: 'Fredoka One', cursive;
+    font-size: clamp(2rem, 5vw, 3rem);
+    color: var(--teal);
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+
+  h1 span { color: var(--amber); }
+
+  #status-bar {
+    margin-top: 10px;
+    font-size: 0.78rem;
+    color: var(--slate);
+    background: white;
+    border: 2px solid var(--amber);
+    border-radius: 6px;
+    padding: 7px 18px;
+    max-width: 560px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    letter-spacing: 0.02em;
+  }
+
+  #status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #94a3b8;
+    flex-shrink: 0;
+    transition: background 0.4s;
+  }
+
+  #status-dot.active { background: var(--teal); box-shadow: 0 0 0 3px rgba(13,148,136,.2); }
+
+  /* ── Scene card ───────────────────────────────────── */
+  #scene-card {
+    width: 100%;
+    max-width: 860px;
+    background: white;
+    border: 3px solid var(--slate);
+    border-radius: 20px;
+    box-shadow: 6px 6px 0 var(--slate);
+    overflow: hidden;
+  }
+
+  #scene-card svg {
+    width: 100%;
+    display: block;
+  }
+
+  /* ── Info chips ───────────────────────────────────── */
+  #chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 16px 20px;
+    border-top: 2px solid #e2e8f0;
+    background: #f8fafc;
+  }
+
+  .chip {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 6px 14px;
+    border-radius: 99px;
+    border: 2px solid #cbd5e1;
+    color: #64748b;
+    background: white;
+    transition: all 0.35s ease;
+  }
+
+  .chip.on {
+    border-color: var(--teal);
+    color: white;
+    background: var(--teal);
+  }
+
+  .chip.flavor-chocolate.on { background: #7c2d12; border-color: #7c2d12; }
+  .chip.flavor-strawberry.on { background: #be123c; border-color: #be123c; }
+  .chip.flavor-mango.on { background: #b45309; border-color: #b45309; }
+
+  /* ── Connection overlay ───────────────────────────── */
+  #overlay {
+    position: fixed; inset: 0;
+    background: rgba(253,246,227,.94);
+    backdrop-filter: blur(4px);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 18px;
+    z-index: 99;
+    transition: opacity 0.4s;
+  }
+
+  #overlay.gone { opacity: 0; pointer-events: none; }
+
+  #overlay p {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.6rem;
+    color: var(--teal);
+  }
+
+  .spinner {
+    width: 48px; height: 48px;
+    border: 5px solid #e2e8f0;
+    border-top-color: var(--teal);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── SVG embedded animations ──────────────────────── */
+  @keyframes blink {
+    0%,88%,100% { transform: scaleY(1); }
+    92% { transform: scaleY(0.08); }
+  }
+
+  .eye-l { transform-origin: 115px 168px; animation: blink 5s 0.5s infinite; }
+  .eye-r { transform-origin: 161px 168px; animation: blink 5s 2.1s infinite; }
+
+  @keyframes chest-pulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+  }
+
+  .chest-1 { animation: chest-pulse 1.8s 0s   infinite; }
+  .chest-2 { animation: chest-pulse 1.8s 0.6s  infinite; }
+  .chest-3 { animation: chest-pulse 1.8s 1.2s  infinite; }
+
+  @keyframes drip-fall {
+    0%   { transform: translateY(0);   opacity: 1; }
+    100% { transform: translateY(46px); opacity: 0; }
+  }
+
+  #drip { display: none; }
+  #drip.flowing { display: block; animation: drip-fall 0.45s ease-in 0s 4; }
+
+  @keyframes cherry-drop {
+    0%   { transform: translateY(-50px); opacity: 0; }
+    60%  { opacity: 1; }
+    80%  { transform: translateY(4px); }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+
+  .cherry-new { animation: cherry-drop 0.55s cubic-bezier(.22,.68,0,1.2) forwards; }
+
+  @keyframes action-pop {
+    0%   { opacity: 0; transform: translateY(-8px) scale(0.9); }
+    20%  { opacity: 1; transform: translateY(0) scale(1); }
+    80%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  #action-pill { animation: action-pop 2.2s ease forwards; }
+
+  @keyframes antenna-blink {
+    0%,40%,100% { fill: var(--amber); }
+    50%,90%     { fill: #fef9c3; }
+  }
+
+  #antenna-ball { animation: antenna-blink 1.6s ease infinite; }
+
+  @keyframes screen-flicker {
+    0%,100% { opacity: 1; }
+    96% { opacity: 0.7; }
+  }
+
+  #machine-screen { animation: screen-flicker 3s ease infinite; }
+
+  /* Pump glow when selected flavor active */
+  @keyframes pump-glow {
+    0%,100% { filter: drop-shadow(0 0 0 transparent); }
+    50%      { filter: drop-shadow(0 0 8px var(--teal-l)); }
+  }
+</style>
+</head>
+<body>
+
+<div id="overlay">
+  <div class="spinner"></div>
+  <p>🍦 Connecting to robot...</p>
+</div>
+
+<header>
+  <h1>🤖 Ice Cream <span>Robot</span></h1>
+  <div id="status-bar">
+    <div id="status-dot"></div>
+    <span id="status-text">Waiting for first action…</span>
+  </div>
+</header>
+
+<div id="scene-card">
+  <svg id="scene" viewBox="0 0 860 450" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="wall-grad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#fef3c7"/>
+        <stop offset="100%" stop-color="#fde68a"/>
+      </linearGradient>
+      <linearGradient id="counter-grad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#fbbf24"/>
+        <stop offset="100%" stop-color="#d97706"/>
+      </linearGradient>
+      <linearGradient id="robot-grad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#0f766e"/>
+        <stop offset="100%" stop-color="#0d9488"/>
+      </linearGradient>
+      <linearGradient id="machine-grad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#e2e8f0"/>
+        <stop offset="100%" stop-color="#cbd5e1"/>
+      </linearGradient>
+      <linearGradient id="glass-sheen" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%"   stop-color="rgba(255,255,255,0.75)"/>
+        <stop offset="35%"  stop-color="rgba(186,230,253,0.35)"/>
+        <stop offset="100%" stop-color="rgba(255,255,255,0.05)"/>
+      </linearGradient>
+      <filter id="shadow-sm">
+        <feDropShadow dx="2" dy="3" stdDeviation="3" flood-color="rgba(0,0,0,0.18)"/>
+      </filter>
+      <filter id="shadow-md">
+        <feDropShadow dx="3" dy="5" stdDeviation="5" flood-color="rgba(0,0,0,0.22)"/>
+      </filter>
+      <filter id="neon">
+        <feGaussianBlur stdDeviation="4" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+
+    <!-- ── Background ──────────────────────────────────── -->
+    <rect width="860" height="450" fill="url(#wall-grad)"/>
+
+    <!-- Wall tiles -->
+    <g stroke="#fcd34d" stroke-width="1" opacity="0.55">
+      <line x1="0" y1="112" x2="860" y2="112"/>
+      <line x1="0" y1="224" x2="860" y2="224"/>
+      <line x1="0" y1="336" x2="860" y2="336"/>
+      <line x1="86"  y1="0" x2="86"  y2="336"/>
+      <line x1="172" y1="0" x2="172" y2="336"/>
+      <line x1="258" y1="0" x2="258" y2="336"/>
+      <line x1="344" y1="0" x2="344" y2="336"/>
+      <line x1="430" y1="0" x2="430" y2="336"/>
+      <line x1="516" y1="0" x2="516" y2="336"/>
+      <line x1="602" y1="0" x2="602" y2="336"/>
+      <line x1="688" y1="0" x2="688" y2="336"/>
+      <line x1="774" y1="0" x2="774" y2="336"/>
+    </g>
+
+    <!-- Counter -->
+    <rect x="0" y="366" width="860" height="84" fill="url(#counter-grad)"/>
+    <rect x="0" y="366" width="860" height="14" fill="#fcd34d"/>
+    <rect x="0" y="368" width="860" height="4" fill="rgba(255,255,255,0.4)"/>
+    <!-- Counter edge stripes -->
+    <g fill="#f59e0b" opacity="0.6">
+      <rect x="0"   y="370" width="40" height="6"/>
+      <rect x="60"  y="370" width="40" height="6"/>
+      <rect x="120" y="370" width="40" height="6"/>
+      <rect x="180" y="370" width="40" height="6"/>
+      <rect x="240" y="370" width="40" height="6"/>
+      <rect x="300" y="370" width="40" height="6"/>
+      <rect x="360" y="370" width="40" height="6"/>
+      <rect x="420" y="370" width="40" height="6"/>
+      <rect x="480" y="370" width="40" height="6"/>
+      <rect x="540" y="370" width="40" height="6"/>
+      <rect x="600" y="370" width="40" height="6"/>
+      <rect x="660" y="370" width="40" height="6"/>
+      <rect x="720" y="370" width="40" height="6"/>
+      <rect x="780" y="370" width="40" height="6"/>
+    </g>
+
+    <!-- ── Ice Cream Machine / Fountain ─────────────────── -->
+    <g filter="url(#shadow-md)">
+      <!-- Cabinet body -->
+      <rect x="298" y="95" width="224" height="271" rx="18" fill="url(#machine-grad)"/>
+      <!-- Cabinet face plate -->
+      <rect x="312" y="112" width="196" height="196" rx="10" fill="#f1f5f9"/>
+
+      <!-- Flavor stripe (top of face plate, colored by JS) -->
+      <rect id="flavor-banner" x="312" y="112" width="196" height="34" rx="10" fill="#94a3b8"/>
+      <rect id="flavor-banner2" x="312" y="133" width="196" height="13" fill="#94a3b8"/>
+      <text id="flavor-name" x="410" y="134" text-anchor="middle"
+            font-family="'Fredoka One',cursive" font-size="17" fill="white"
+            letter-spacing="1">NO FLAVOR</text>
+
+      <!-- Screen -->
+      <rect id="machine-screen" x="322" y="154" width="176" height="100" rx="7" fill="#0f172a"/>
+      <text x="410" y="182" text-anchor="middle" font-family="'Space Mono',monospace"
+            font-size="10" fill="#4ade80">◉ SYSTEM READY</text>
+      <text x="410" y="200" text-anchor="middle" font-family="'Space Mono',monospace"
+            font-size="9" fill="#64748b" letter-spacing="1">─────────────────</text>
+      <text id="screen-flavor" x="410" y="220" text-anchor="middle" font-family="'Space Mono',monospace"
+            font-size="11" fill="#94a3b8">FLAVOR: ──</text>
+      <text id="screen-status" x="410" y="238" text-anchor="middle" font-family="'Space Mono',monospace"
+            font-size="9" fill="#475569">AWAITING INPUT</text>
+
+      <!-- Control buttons -->
+      <circle cx="348" cy="275" r="9" fill="#ef4444"/>
+      <circle cx="348" cy="275" r="5" fill="#fca5a5" opacity="0.5"/>
+      <circle cx="374" cy="275" r="9" fill="#22c55e"/>
+      <circle cx="374" cy="275" r="5" fill="#86efac" opacity="0.5"/>
+      <circle cx="400" cy="275" r="9" fill="#f59e0b"/>
+      <circle cx="400" cy="275" r="5" fill="#fde68a" opacity="0.5"/>
+
+      <!-- Nozzle housing -->
+      <rect x="386" y="292" width="48" height="18" rx="6" fill="#94a3b8"/>
+      <!-- Nozzle tube -->
+      <rect x="398" y="306" width="24" height="60" rx="5" fill="#64748b"/>
+      <rect x="404" y="318" width="12" height="48" rx="3" fill="#475569"/>
+
+      <!-- Drip (animated) -->
+      <ellipse id="drip" cx="410" cy="358" rx="7" ry="5" fill="#94a3b8"/>
+
+      <!-- Side details -->
+      <rect x="298" y="140" width="14" height="120" rx="5" fill="#cbd5e1"/>
+      <rect x="508" y="140" width="14" height="120" rx="5" fill="#cbd5e1"/>
+    </g>
+
+    <!-- ── Robot ─────────────────────────────────────────── -->
+    <g id="robot-body" filter="url(#shadow-md)">
+      <!-- Antenna pole -->
+      <line x1="138" y1="90" x2="138" y2="128" stroke="#0f766e" stroke-width="5" stroke-linecap="round"/>
+      <!-- Antenna ball -->
+      <circle id="antenna-ball" cx="138" cy="84" r="12" fill="#f59e0b"/>
+      <circle cx="138" cy="84" r="6" fill="#fef9c3"/>
+
+      <!-- Head -->
+      <rect x="96"  y="128" width="90" height="76" rx="16" fill="url(#robot-grad)"/>
+      <!-- Head highlight -->
+      <rect x="103" y="133" width="44" height="22" rx="9" fill="rgba(255,255,255,0.15)"/>
+
+      <!-- Left eye -->
+      <circle class="eye-l" cx="115" cy="168" r="13" fill="white"/>
+      <circle cx="115" cy="168" r="7"  fill="#0f172a"/>
+      <circle cx="117" cy="166" r="2.5" fill="white"/>
+
+      <!-- Right eye -->
+      <circle class="eye-r" cx="161" cy="168" r="13" fill="white"/>
+      <circle cx="161" cy="168" r="7"  fill="#0f172a"/>
+      <circle cx="163" cy="166" r="2.5" fill="white"/>
+
+      <!-- Mouth / grill -->
+      <rect x="116" y="188" width="50" height="8" rx="4" fill="rgba(0,0,0,0.3)"/>
+      <rect x="122" y="190" width="8"  height="4" rx="2" fill="rgba(255,255,255,0.2)"/>
+      <rect x="133" y="190" width="8"  height="4" rx="2" fill="rgba(255,255,255,0.2)"/>
+      <rect x="144" y="190" width="8"  height="4" rx="2" fill="rgba(255,255,255,0.2)"/>
+      <rect x="155" y="190" width="4"  height="4" rx="2" fill="rgba(255,255,255,0.2)"/>
+
+      <!-- Body -->
+      <rect x="80"  y="212" width="130" height="128" rx="14" fill="url(#robot-grad)"/>
+      <rect x="90"  y="220" width="58"  height="28"  rx="9"  fill="rgba(255,255,255,0.1)"/>
+
+      <!-- Chest panel -->
+      <rect x="90"  y="258" width="110" height="72" rx="9" fill="rgba(0,0,0,0.2)"/>
+      <!-- Chest lights -->
+      <circle class="chest-1" cx="108" cy="280" r="9" fill="#4ade80"/>
+      <circle class="chest-2" cx="138" cy="280" r="9" fill="#38bdf8"/>
+      <circle class="chest-3" cx="168" cy="280" r="9" fill="#fb923c"/>
+      <!-- Panel bar -->
+      <rect x="96" y="303" width="98" height="8"  rx="4" fill="rgba(255,255,255,0.12)"/>
+      <rect x="96" y="317" width="60" height="6"  rx="3" fill="rgba(255,255,255,0.08)"/>
+
+      <!-- Left arm (static, decorative) -->
+      <rect x="52" y="218" width="28" height="88" rx="14" fill="#0d9488"/>
+      <circle cx="66" cy="312" r="18" fill="#0f766e"/>
+
+      <!-- Legs -->
+      <rect x="93"  y="336" width="50" height="18" rx="8" fill="#0d9488"/>
+      <rect x="147" y="336" width="50" height="18" rx="8" fill="#0d9488"/>
+      <rect x="97"  y="348" width="42" height="28" rx="10" fill="#0f766e"/>
+      <rect x="151" y="348" width="42" height="28" rx="10" fill="#0f766e"/>
+      <!-- Foot soles -->
+      <rect x="93"  y="370" width="50" height="6" rx="3" fill="#065f46"/>
+      <rect x="147" y="370" width="50" height="6" rx="3" fill="#065f46"/>
+    </g>
+
+    <!-- Robot right arm (dynamic - drawn above body for z-order) -->
+    <line id="robot-arm" x1="206" y1="242" x2="218" y2="340"
+          stroke="#0d9488" stroke-width="22" stroke-linecap="round"
+          filter="url(#shadow-sm)"/>
+    <circle id="robot-hand" cx="218" cy="340" r="16" fill="#0f766e"/>
+
+    <!-- ── Glass group (position driven by JS) ───────────── -->
+    <!-- Glass anchor = bottom-center (0,0); glass top at y=-56 -->
+    <g id="glass-group" transform="translate(218,340)" opacity="0">
+      <!-- Glass body (trapezoid, anchor at bottom-center) -->
+      <polygon id="glass-poly"
+               points="-30,-56 30,-56 20,0 -20,0"
+               fill="rgba(186,230,253,0.55)"
+               stroke="rgba(125,211,252,0.85)"
+               stroke-width="2.5"
+               stroke-linejoin="round"/>
+      <!-- Glass sheen overlay -->
+      <polygon points="-30,-56 30,-56 20,0 -20,0" fill="url(#glass-sheen)"/>
+      <!-- Rim highlight -->
+      <line x1="-30" y1="-56" x2="30" y2="-56"
+            stroke="rgba(255,255,255,0.95)" stroke-width="3" stroke-linecap="round"/>
+
+      <!-- Ice cream scoop (hidden until pumped) -->
+      <g id="ice-cream-g" visibility="hidden">
+        <ellipse id="scoop-shadow" cx="1"  cy="-62" rx="23" ry="10" fill="rgba(0,0,0,0.12)"/>
+        <ellipse id="scoop-main"   cx="0"  cy="-68" rx="25" ry="17" fill="#d4a5a5"/>
+        <ellipse cx="-7" cy="-73" rx="9"  ry="5"   fill="rgba(255,255,255,0.38)"/>
+        <!-- Waffle cone pattern lines on scoop -->
+        <path d="M-22,-65 Q-6,-78 16,-64" stroke="rgba(0,0,0,0.08)" stroke-width="1.5" fill="none"/>
+        <path d="M-20,-70 Q-2,-83 18,-70" stroke="rgba(0,0,0,0.07)" stroke-width="1.5" fill="none"/>
+      </g>
+
+      <!-- Cherry group (populated by JS) -->
+      <g id="cherry-g" visibility="hidden"></g>
+    </g>
+
+    <!-- ── Customer ───────────────────────────────────────── -->
+    <g id="customer" filter="url(#shadow-sm)">
+      <!-- Body -->
+      <rect x="652" y="220" width="96" height="130" rx="22" fill="#fb923c"/>
+      <!-- Head -->
+      <circle cx="700" cy="182" r="46" fill="#fde68a"/>
+      <!-- Hair -->
+      <path d="M 654 165 Q 660 118 700 114 Q 740 118 746 165"
+            fill="#92400e"/>
+      <!-- Eyes -->
+      <circle cx="683" cy="178" r="7" fill="#1e293b"/>
+      <circle cx="717" cy="178" r="7" fill="#1e293b"/>
+      <circle cx="685" cy="176" r="2.5" fill="white"/>
+      <circle cx="719" cy="176" r="2.5" fill="white"/>
+      <!-- Smile -->
+      <path d="M 682 196 Q 700 210 718 196"
+            stroke="#1e293b" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <!-- Buttons -->
+      <circle cx="700" cy="248" r="5" fill="rgba(0,0,0,0.2)"/>
+      <circle cx="700" cy="268" r="5" fill="rgba(0,0,0,0.2)"/>
+      <!-- Extended arm (reaching for ice cream) -->
+      <line x1="652" y1="252" x2="590" y2="295"
+            stroke="#fb923c" stroke-width="24" stroke-linecap="round"/>
+      <!-- Customer hand -->
+      <circle cx="583" cy="298" r="19" fill="#fde68a"/>
+    </g>
+
+    <!-- ── Action label (pops up briefly) ───────────────── -->
+    <g id="action-pill-wrap" visibility="hidden">
+      <g id="action-pill">
+        <rect id="action-bg" x="260" y="28" width="340" height="44" rx="22"
+              fill="#0f172a"/>
+        <text id="action-text" x="430" y="55" text-anchor="middle"
+              font-family="'Space Mono',monospace" font-size="12"
+              font-weight="700" fill="#4ade80" letter-spacing="0.5">…</text>
+      </g>
+    </g>
+
+  </svg>
+
+  <!-- Chips -->
+  <div id="chips">
+    <div class="chip" id="chip-glass">🥛 No glass</div>
+    <div class="chip" id="chip-position">📍 Idle</div>
+    <div class="chip flavor-chocolate" id="chip-flavor">🍦 No flavor</div>
+    <div class="chip" id="chip-icecream">❄️ Empty</div>
+    <div class="chip" id="chip-cherries">🍒 0 cherries</div>
+  </div>
+</div>
+
+<script>
+// ── DOM refs ────────────────────────────────────────────────────────────────
+const overlay      = document.getElementById('overlay');
+const statusDot    = document.getElementById('status-dot');
+const statusText   = document.getElementById('status-text');
+const armLine      = document.getElementById('robot-arm');
+const handCircle   = document.getElementById('robot-hand');
+const glassGroup   = document.getElementById('glass-group');
+const iceCreamG    = document.getElementById('ice-cream-g');
+const scoopMain    = document.getElementById('scoop-main');
+const scoopShadow  = document.getElementById('scoop-shadow');
+const cherryG      = document.getElementById('cherry-g');
+const dripEl       = document.getElementById('drip');
+const flavorBanner = document.getElementById('flavor-banner');
+const flavorBanner2= document.getElementById('flavor-banner2');
+const flavorName   = document.getElementById('flavor-name');
+const screenFlavor = document.getElementById('screen-flavor');
+const screenStatus = document.getElementById('screen-status');
+const actionWrap   = document.getElementById('action-pill-wrap');
+const actionPill   = document.getElementById('action-pill');
+const actionText   = document.getElementById('action-text');
+const actionBg     = document.getElementById('action-bg');
+
+const chipGlass    = document.getElementById('chip-glass');
+const chipPos      = document.getElementById('chip-position');
+const chipFlavor   = document.getElementById('chip-flavor');
+const chipIce      = document.getElementById('chip-icecream');
+const chipCherries = document.getElementById('chip-cherries');
+
+// ── Flavor palette ──────────────────────────────────────────────────────────
+const FLAVORS = {
+  chocolate: { banner: '#7c2d12', banner2: '#92400e', scoop: '#6b2810', scoopHL: '#a3522a', drip: '#92400e', text: '#fef3c7' },
+  strawberry:{ banner: '#9f1239', banner2: '#be123c', scoop: '#fb7185', scoopHL: '#fda4af', drip: '#fb7185', text: '#fff1f2' },
+  mango:     { banner: '#78350f', banner2: '#b45309', scoop: '#fbbf24', scoopHL: '#fde68a', drip: '#fbbf24', text: '#fff7ed' },
+};
+
+// ── Glass target positions  [arm-end-x, arm-end-y, glass-cx, glass-cy] ─────
+// glass-cy = glass bottom anchor Y
+const POS = {
+  idle:     { ax: 218, ay: 345, gx: 218, gy: 340 },
+  holding:  { ax: 222, ay: 338, gx: 222, gy: 334 },
+  fountain: { ax: 410, ay: 360, gx: 410, gy: 356 },
+  serving:  { ax: 582, ay: 295, gx: 582, gy: 291 },
+};
+
+// ── Interpolation state ─────────────────────────────────────────────────────
+const cur = { ax: 218, ay: 345, gx: 218, gy: 340, op: 0 };
+const tgt = { ax: 218, ay: 345, gx: 218, gy: 340, op: 0 };
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+(function tick() {
+  const S = 0.09;
+  cur.ax = lerp(cur.ax, tgt.ax, S);
+  cur.ay = lerp(cur.ay, tgt.ay, S);
+  cur.gx = lerp(cur.gx, tgt.gx, S);
+  cur.gy = lerp(cur.gy, tgt.gy, S);
+  cur.op = lerp(cur.op, tgt.op, S);
+
+  armLine.setAttribute('x2', cur.ax.toFixed(1));
+  armLine.setAttribute('y2', cur.ay.toFixed(1));
+  handCircle.setAttribute('cx', cur.ax.toFixed(1));
+  handCircle.setAttribute('cy', cur.ay.toFixed(1));
+  glassGroup.setAttribute('transform', `translate(${cur.gx.toFixed(1)},${cur.gy.toFixed(1)})`);
+  glassGroup.setAttribute('opacity', cur.op.toFixed(3));
+
+  requestAnimationFrame(tick);
+})();
+
+function setPos(key) {
+  const p = POS[key];
+  tgt.ax = p.ax; tgt.ay = p.ay;
+  tgt.gx = p.gx; tgt.gy = p.gy;
+}
+
+// ── Cherry rendering ────────────────────────────────────────────────────────
+let lastCherryCount = 0;
+
+const CHERRY_SPOTS = [
+  { x:  0, y: -86 },
+  { x:-14, y: -83 },
+  { x: 14, y: -83 },
+  { x: -7, y: -93 },
+  { x:  7, y: -93 },
+];
+
+function renderCherries(count, animate) {
+  if (count === lastCherryCount) return;
+  const prev = lastCherryCount;
+  lastCherryCount = count;
+
+  cherryG.innerHTML = '';
+  for (let i = 0; i < Math.min(count, 5); i++) {
+    const p = CHERRY_SPOTS[i];
+    const ns = 'http://www.w3.org/2000/svg';
+    const g = document.createElementNS(ns, 'g');
+    if (animate && i >= prev) g.classList.add('cherry-new');
+    g.innerHTML = `
+      <line x1="${p.x+2}" y1="${p.y}" x2="${p.x+6}" y2="${p.y-12}"
+            stroke="#15803d" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="${p.x}" cy="${p.y}" r="8.5" fill="#dc2626"/>
+      <circle cx="${p.x-3}" cy="${p.y-3}" r="3"   fill="rgba(255,255,255,0.45)"/>
+    `;
+    cherryG.appendChild(g);
+  }
+
+  if (count > 0) {
+    cherryG.setAttribute('visibility', 'visible');
+  } else {
+    cherryG.setAttribute('visibility', 'hidden');
+  }
+}
+
+// ── Drip animation ──────────────────────────────────────────────────────────
+function triggerDrip(color) {
+  dripEl.setAttribute('fill', color);
+  dripEl.classList.remove('flowing');
+  void dripEl.offsetWidth;
+  dripEl.classList.add('flowing');
+  setTimeout(() => dripEl.classList.remove('flowing'), 2000);
+}
+
+// ── Action pill ─────────────────────────────────────────────────────────────
+let pillTimer = null;
+
+function showAction(msg) {
+  if (!msg || msg === 'init') return;
+
+  // Trim long messages for display
+  const display = msg.length > 52 ? msg.slice(0, 50) + '…' : msg;
+  actionText.textContent = display;
+  // Resize background based on text length
+  const w = Math.max(260, display.length * 9.2 + 60);
+  actionBg.setAttribute('width', w);
+  actionBg.setAttribute('x', (860 - w) / 2);
+  actionText.setAttribute('x', 430);
+
+  actionWrap.setAttribute('visibility', 'visible');
+  actionPill.style.animation = 'none';
+  void actionPill.offsetWidth;
+  actionPill.style.animation = 'action-pop 2.4s ease forwards';
+
+  if (pillTimer) clearTimeout(pillTimer);
+  pillTimer = setTimeout(() => actionWrap.setAttribute('visibility', 'hidden'), 2500);
+}
+
+// ── Chip helpers ─────────────────────────────────────────────────────────────
+function setChip(el, label, active, extraClass) {
+  el.textContent = label;
+  el.className = 'chip' + (active ? ' on' : '') + (extraClass ? ' ' + extraClass : '');
+}
+
+// ── Main state update ─────────────────────────────────────────────────────────
+let prevState = null;
+let servingActive = false;
+
+function applyState(s, savedPrev) {
+  // Glass position
+  if (!s.hasGlass) {
+    tgt.op = 0;
+    setPos('idle');
+  } else if (s.glassUnderFountain) {
+    tgt.op = 1;
+    setPos('fountain');
+  } else {
+    tgt.op = 1;
+    setPos('holding');
+  }
+
+  // Ice cream
+  const src = savedPrev || s;
+  if (src.hasIceCream || s.hasIceCream) {
+    iceCreamG.setAttribute('visibility', 'visible');
+    const f = FLAVORS[s.selectedFlavor || src.selectedFlavor] || FLAVORS.strawberry;
+    scoopMain.setAttribute('fill', f.scoop);
+    scoopShadow.setAttribute('fill', 'rgba(0,0,0,0.12)');
+  } else {
+    iceCreamG.setAttribute('visibility', 'hidden');
+  }
+
+  // Cherries
+  renderCherries(s.cherryCount, true);
+
+  // Flavor banner
+  if (s.selectedFlavor) {
+    const f = FLAVORS[s.selectedFlavor];
+    flavorBanner.setAttribute('fill', f.banner);
+    flavorBanner2.setAttribute('fill', f.banner2);
+    flavorName.textContent = s.selectedFlavor.toUpperCase();
+    flavorName.setAttribute('fill', f.text);
+    screenFlavor.textContent = `FLAVOR: ${s.selectedFlavor.toUpperCase()}`;
+    screenFlavor.setAttribute('fill', '#fbbf24');
+    dripEl.setAttribute('fill', f.drip);
+  } else {
+    flavorBanner.setAttribute('fill', '#64748b');
+    flavorBanner2.setAttribute('fill', '#64748b');
+    flavorName.textContent = 'NO FLAVOR';
+    flavorName.setAttribute('fill', 'white');
+    screenFlavor.textContent = 'FLAVOR: ──';
+    screenFlavor.setAttribute('fill', '#94a3b8');
+  }
+
+  // Screen status
+  if (s.hasIceCream) {
+    screenStatus.textContent = s.cherryCount > 0
+      ? `CHERRIES: ${s.cherryCount}  ★ PERFECT`
+      : 'DISPENSING OK';
+    screenStatus.setAttribute('fill', '#4ade80');
+  } else if (s.glassUnderFountain) {
+    screenStatus.textContent = 'GLASS DETECTED';
+    screenStatus.setAttribute('fill', '#38bdf8');
+  } else if (s.hasGlass) {
+    screenStatus.textContent = 'GLASS: HELD';
+    screenStatus.setAttribute('fill', '#38bdf8');
+  } else {
+    screenStatus.textContent = 'AWAITING INPUT';
+    screenStatus.setAttribute('fill', '#475569');
+  }
+
+  // Info chips
+  setChip(chipGlass, s.hasGlass ? '🥛 Holding glass' : '🥛 No glass', s.hasGlass);
+  setChip(chipPos,
+    s.glassUnderFountain ? '📍 Under fountain' : s.hasGlass ? '📍 In hand' : '📍 Idle',
+    s.glassUnderFountain);
+  const fl = s.selectedFlavor;
+  setChip(chipFlavor, fl ? `🍦 ${fl.charAt(0).toUpperCase()+fl.slice(1)}` : '🍦 No flavor',
+    !!fl, fl ? `flavor-${fl}` : '');
+  setChip(chipIce, s.hasIceCream ? '🍨 Has ice cream' : '❄️ Empty', s.hasIceCream);
+  const cn = s.cherryCount;
+  setChip(chipCherries, `🍒 ${cn} ${cn === 1 ? 'cherry' : 'cherries'}`, cn > 0);
+}
+
+function onUpdate(s) {
+  const action = s.lastAction || '';
+  const isServed = action.startsWith('Served');
+  const isPumped = action.startsWith('Pumped');
+  const isPickup = action.startsWith('Picked up');
+  const isCherryAdd = action.startsWith('Cherry added');
+
+  // Update status bar
+  if (action && action !== 'init') {
+    statusText.textContent = action;
+    statusDot.classList.add('active');
+  }
+
+  showAction(action);
+
+  // Pump trigger
+  if (isPumped && prevState && !prevState.hasIceCream) {
+    const f = FLAVORS[s.selectedFlavor] || { drip: '#a78bfa' };
+    setTimeout(() => triggerDrip(f.drip), 80);
+  }
+
+  // Serving animation: briefly show glass moving to customer, then vanish
+  if (isServed && prevState && prevState.hasIceCream && !servingActive) {
+    servingActive = true;
+    tgt.op = 1;
+    setPos('serving');
+
+    // Keep visual of previous served state during animation
+    const saved = { ...prevState };
+    applyState({ ...s, hasIceCream: true, selectedFlavor: saved.selectedFlavor,
+                 cherryCount: saved.cherryCount }, saved);
+
+    setTimeout(() => {
+      tgt.op = 0;
+      setTimeout(() => {
+        servingActive = false;
+        applyState(s);
+        lastCherryCount = 0; // force re-render next time
+      }, 700);
+    }, 1100);
+
+    prevState = s;
+    return;
+  }
+
+  // New glass pickup: snap position immediately (don't lerp from old spot)
+  if (isPickup) {
+    cur.gx = POS.holding.gx;
+    cur.gy = POS.holding.gy;
+    cur.ax = POS.holding.ax;
+    cur.ay = POS.holding.ay;
+  }
+
+  applyState(s);
+  prevState = s;
+}
+
+// ── SSE connection ────────────────────────────────────────────────────────────
+function connect() {
+  const src = new EventSource('/events');
+
+  src.onopen = () => overlay.classList.add('gone');
+
+  src.onmessage = e => {
+    overlay.classList.add('gone');
+    let s;
+    try { s = JSON.parse(e.data); } catch { return; }
+    onUpdate(s);
+  };
+
+  src.onerror = () => {
+    statusDot.classList.remove('active');
+    src.close();
+    setTimeout(connect, 1000);
+  };
+}
+
+connect();
+</script>
+</body>
+</html>
